@@ -5,11 +5,11 @@ export async function main(ns) {
     
     const folders = ["/bin", "/core", "/lib", "/sys", "/data"];
     const manifest = [
-        { remote: "farm.js", local: "/bin/farm.js" },
-        { remote: "worker.js", local: "/core/worker.js" },
-        { remote: "network.js", local: "/lib/network.js" },
-        { remote: "analyze.js", local: "/lib/analyze.js" },
-        { remote: "deploy.js", local: "/lib/deploy.js" }
+        { remote: "bin/farm.js", local: "/bin/farm.js" },
+        { remote: "core/worker.js", local: "/core/worker.js" },
+        { remote: "lib/network.js", local: "/lib/network.js" },
+        { remote: "lib/analyze.js", local: "/lib/analyze.js" },
+        { remote: "lib/deploy.js", local: "/lib/deploy.js" }
     ];
 
     ns.tprint("🚀 Starting Bootstrap Process...");
