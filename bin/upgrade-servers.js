@@ -1,54 +1,108 @@
-// this script is used to upgrade the servers to the next tier
-import { deployWorker } from "/lib/deploy.js";
 /** @param {NS} ns **/
+import { deployWorker } from "/lib/deploy.js";
+
 export async function main(ns) {
-    const maxRam = 2 ** 20; // maximum purchased server RAM
     const serverNamePrefix = "pserv-";
-  
-      // --- Get costs ---
-      const currentHomeRam = ns.getServerMaxRam("home")[0];
-      const homeCost = 32000 * (currentHomeRam / 2);
-  
-  
-      // Compute current max RAM among your purchased servers 
-      const pservs = ns.getPurchasedServers();
-  
-      const maxPurchasable = ns.getPurchasedServerMaxRam();
-      const currentFleetMax = pservs.length ? Math.max(...pservs.map(s => ns.getServerMaxRam(s))) : 0;
-      // Next target tier (double, capped by global max) 
-      const startingServerSize = 8
-      const nextRam = Math.min(currentFleetMax > 0 ? currentFleetMax * 2 : startingServerSize, 
-        maxPurchasable);
-      const serverCost = ns.getPurchasedServerCost(nextRam);
-  
-      // --- Compare ---
-      if (homeCost < serverCost) {
-        ns.tprint(`💡 Home upgrade is cheaper (${ns.formatNumber(homeCost)} vs ${ns.formatNumber(serverCost)}). Stopping server upgrades.`);
-        ns.exec("sys/upgrade-home.js");
-      }
-  
-      // --- Try upgrading servers ---
-      for (let i = 0; i < ns.getPurchasedServerLimit(); i++) {
+    const pservLimit = ns.getPurchasedServerLimit();
+    const maxPurchasable = ns.getPurchasedServerMaxRam();
+
+    // --- Program & Darkweb Status ---
+    const programs = [
+        "BruteSSH.exe",
+        "FTPCrack.exe",
+        "relaySMTP.exe",
+        "HTTPWorm.exe",
+        "SQLInject.exe"
+    ];
+    
+    // Check status
+    const missingPrograms = programs.filter(p => !ns.fileExists(p, "home"));
+    const hasTor = ns.getPlayer().tor;
+    const currentMoney = ns.getServerMoneyAvailable("home");
+
+    // --- Dynamic Phase Logic ---
+    const hackLevelTrigger = 500;
+    const currentHackLevel = ns.getHackingLevel();
+    
+    // Switch to savings if:
+    // 1. High Hacking Level (Saving for Augments)
+    // 2. We have TOR + >200k + missing programs (Saving for Darkweb software)
+    const isSavingForAugs = currentHackLevel > hackLevelTrigger;
+    const isSavingForSoftware = hasTor || currentMoney > 200000 && missingPrograms.length > 0;
+
+    let reservePercent = 0.00;
+    if (isSavingForAugs) {
+        reservePercent = 0.80;
+        ns.tprint(`💰 Phase: SAVING (Hacking Level: ${currentHackLevel}).`);
+    } else if (isSavingForSoftware) {
+        reservePercent = 0.50; 
+        ns.tprint(`🛠️ Phase: PREPARING (Tor active, saving for missing programs).`);
+    } else {
+        ns.tprint(`🚀 Phase: GROWTH (Infrastructure focus).`);
+    }
+    
+    const spendableMoney = currentMoney * (1 - reservePercent);
+
+    /**
+     * Helper to find the highest power of 2 RAM we can afford.
+     */
+    function getAffordableRam(money) {
+        let ram = maxPurchasable;
+        while (ram >= 8) {
+            if (ns.getPurchasedServerCost(ram) <= money) return ram;
+            ram /= 2;
+        }
+        return 0;
+    }
+
+    // --- Upgrade Logic ---
+    let remainingBudget = spendableMoney;
+
+    // 1. Home Upgrade Check (Manual calc to save RAM)
+    const currentHomeRam = ns.getServerMaxRam("home");
+    if (currentHomeRam < maxPurchasable) {
+        const homeUpgradeCost = currentHomeRam*32000 * Math.pow(1.58, Math.log2(currentHomeRam));
+        if (remainingBudget >= homeUpgradeCost) {
+            if (ns.fileExists("sys/upgrade-home.js")) {
+                ns.tprint(`Upgrade Home RAM: ${currentHomeRam} Est Cost: ${ns.formatNumber(homeUpgradeCost)}`)
+                ns.exec("sys/upgrade-home.js", "home");
+            }
+        }
+    }
+
+    // 2. Identify and Sort Slots (Empty first, then smallest RAM)
+    const allSlots = [];
+    for (let i = 0; i < pservLimit; i++) {
         const name = serverNamePrefix + i;
         if (ns.serverExists(name)) {
-          const ram = ns.getServerMaxRam(name);
-          if (ram < nextRam) {
-            if (ns.getServerMoneyAvailable("home") >= serverCost) {
-              ns.deleteServer(name);
-              ns.purchaseServer(name, nextRam);
-              await deployWorker(ns, name);
-              ns.tprint(`Upgraded ${name} to ${nextRam} GB`);
-            }
-          }
+            allSlots.push({ name, ram: ns.getServerMaxRam(name), exists: true });
         } else {
-          if (ns.getServerMoneyAvailable("home") >= serverCost) {
-            ns.purchaseServer(name, nextRam);
-            await deployWorker(ns, name);
-            ns.tprint(`Purchased ${name} with ${nextRam} GB`);
-          }
+            allSlots.push({ name, ram: 0, exists: false });
         }
-      }
-  
-      await ns.sleep(60000); // check every minute
-  }
-  
+    }
+
+    allSlots.sort((a, b) => {
+        if (a.exists !== b.exists) return a.exists ? 1 : -1;
+        return a.ram - b.ram;
+    });
+
+    // 3. Execution Loop for Servers
+    for (const slot of allSlots) {
+        const targetRam = getAffordableRam(remainingBudget);
+        if (targetRam <= slot.ram) continue; 
+
+        const cost = ns.getPurchasedServerCost(targetRam);
+        if (remainingBudget >= cost) {
+            if (slot.exists) {
+                ns.killall(slot.name);
+                ns.deleteServer(slot.name);
+            }
+            
+            if (ns.purchaseServer(slot.name, targetRam)) {
+ //               await deployWorker(ns, slot.name);
+                ns.tprint(`✅ ${slot.name}: ${ns.formatRam(slot.ram)} -> ${ns.formatRam(targetRam)}`);
+                remainingBudget -= cost;
+            }
+        }
+    }
+}

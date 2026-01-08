@@ -5,8 +5,9 @@ export async function main(ns) {
     // --- Define tasks here ---
     // Each entry: script name, interval in ms, description
     const tasks = {
-        "bin/farm.js":        { interval: 600_000, lastRun: 0, desc: "Distribute threads" },
-        "bin/upgrade-servers.js":{ interval: 60_000, lastRun: 0, desc: "Try upgrading servers" }
+        "sys/config-set.js":        { interval: 6000_000, lastRun: 0, desc: "Distribute threads" },
+        "core/hybrid.js":        { interval: 30_000, lastRun: 0, desc: "Distribute threads" },
+        "bin/upgrade-servers.js":{ interval: 600_000, lastRun: 0, desc: "Try upgrading servers" }
     };
 
     await ns.write(logFile, `\n=== Manager started at ${new Date().toLocaleTimeString()} ===\n`, "a");
