@@ -10,7 +10,9 @@ export async function main(ns) {
         { remote: "lib/network.js", local: "/lib/network.js" },
         { remote: "lib/analyze.js", local: "/lib/analyze.js" },
         { remote: "bin/upgrade-servers.js", local: "/bin/upgrade-servers.js" },
-        { remote: "core/orchestrator.js", local: "/core/orchestrator.js" }
+        { remote: "core/orchestrator.js", local: "/core/orchestrator.js" },
+        { remote: "bin/rep-on.js", local: "/bin/rep-on.js" },
+        { remote: "bin/rep-off.js", local: "/bin/rep-off.js" }
     ];
 
     ns.tprint("🚀 Starting Bootstrap Process...");
