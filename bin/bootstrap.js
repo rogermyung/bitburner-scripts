@@ -5,11 +5,10 @@ export async function main(ns) {
     
     const folders = ["/bin", "/core", "/lib", "/sys", "/data"];
     const manifest = [
-        { remote: "bin/farm.js", local: "/bin/farm.js" },
-        { remote: "core/worker.js", local: "/core/worker.js" },
+        { remote: "core/hybrid.js", local: "/core/hybrid.js" },
+        { remote: "sys/config-set.js", local: "/sys/config-set.js" },        
         { remote: "lib/network.js", local: "/lib/network.js" },
         { remote: "lib/analyze.js", local: "/lib/analyze.js" },
-        { remote: "lib/deploy.js", local: "/lib/deploy.js" },
         { remote: "bin/upgrade-servers.js", local: "/bin/upgrade-servers.js" },
         { remote: "core/orchestrator.js", local: "/core/orchestrator.js" }
     ];
